@@ -88,6 +88,14 @@
     padding:16px;border-radius:14px;font-family:sans-serif;font-size:16px;
   }
   .note{font-family:sans-serif;font-size:11px;color:var(--sub);margin-top:14px;line-height:1.7}
+  .steps{margin-top:18px;text-align:left;background:#fbf7ef;border:1px solid var(--line);
+    border-radius:12px;padding:14px 16px}
+  .steps-ttl{font-family:sans-serif;font-size:12px;color:var(--gold-d);letter-spacing:.08em;
+    font-weight:700;margin-bottom:8px;text-align:center}
+  .steps ol{margin:0;padding-left:1.2em;color:#4a443c;font-size:13px;line-height:1.85;font-family:sans-serif}
+  .steps ol b{color:var(--ink)}
+  .line-link{display:block;margin-top:12px;text-align:center;background:#06c755;color:#fff;
+    text-decoration:none;font-family:sans-serif;font-size:14px;font-weight:700;padding:11px;border-radius:10px}
 
   /* ---- エラー / 状態 ---- */
   #state{display:none;max-width:360px;width:100%;text-align:center;
@@ -138,7 +146,17 @@
         </div>
 
         <a class="reserve" id="cReserve" href="#" target="_blank" rel="noopener">ご予約はこちら</a>
-        <div class="note">ご来店時に、この画面のギフトコードをスタッフへお見せください。<br>現金との引き換え・払い戻しはできません。</div>
+
+        <div class="steps">
+          <div class="steps-ttl">ご予約の流れ</div>
+          <ol>
+            <li>上の「ご予約はこちら」から、ご希望の日時をご予約ください。</li>
+            <li>ご来店時に、<b>この画面（ギフトコード）</b>をスタッフへお見せください。</li>
+          </ol>
+          <a class="line-link" id="cLine" href="#" target="_blank" rel="noopener">LINEで相談・ご連絡はこちら</a>
+        </div>
+
+        <div class="note">現金との引き換え・払い戻しはできません。</div>
       </div>
     </div>
   </div>
@@ -195,6 +213,7 @@
     document.getElementById('cExpiry').textContent = d.expiry;
     document.getElementById('cCode').textContent   = getParam('code');
     document.getElementById('cReserve').href       = d.reserveUrl || '#';
+    document.getElementById('cLine').href          = d.lineUrl || '#';
     if(d.message){
       document.getElementById('cMsg').textContent  = d.message;
       document.getElementById('cFrom').textContent = d.sender ? ('— ' + d.sender + ' より') : '';
