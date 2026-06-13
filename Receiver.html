@@ -217,35 +217,35 @@
 
 <script>
   // ===== 設定 =====
-  // GAS Webアプリの /exec URL（デプロイ後に取得して貼り付け）
-  var GAS_API_URL = 'https://script.google.com/macros/s/AKfycbw7z2qGOzBQB4fT2Vk16-HHI0d54l_1sqC4ED1ELPgoKn0qTk9X9m23aDuB0p_96pFPBw/exec'; // TODO
-
-  var giftData = null;
+  var GAS_API_URL = 'https://script.google.com/macros/s/AKfycbw7z2qGOzBQB4fT2Vk16-HHI0d54l_1sqC4ED1ELPgoKn0qTk9X9m23aDuB0p_96pFPBw/exec'; // メッセージ保存(POST)用
+  var RESERVE_URL = 'https://ssv.onemorehand.jp/asagaya-angelwing/'; // ご予約（Onemorehand）
+  var LINE_URL    = 'https://page.line.me/877zcqqo';                  // LINEで相談
 
   function getParam(name){
     var m = new RegExp('[?&]'+name+'=([^&]*)').exec(location.search);
-    return m ? decodeURIComponent(m[1]) : '';
+    return m ? decodeURIComponent(m[1].replace(/\+/g,' ')) : '';
   }
 
-  // JSONPでギフト情報を取得
-  window.onGift = function(data){
-    if(!data || data.error || data.state === undefined){
-      return showState('🔍','ギフトが見つかりません','コードをご確認のうえ、お手数ですがお店までお問い合わせください。');
-    }
-    if(data.state === 'used')   return showState('✓','このギフトは使用済みです','すでにご利用いただいたギフト券です。');
-    if(data.state === 'expired')return showState('⏳','有効期限が過ぎています','大変申し訳ございません。お店までご相談ください。');
-    giftData = data;
-    if(getParam('mode') === 'write') showWrite();   // 贈り主：メッセージ入力
-    else showOpening();                              // 受取人：開封
+  var code = getParam('code');
+  var giftData = {
+    menu:    getParam('m'),
+    expiry:  getParam('e'),
+    sender:  getParam('s'),
+    message: getParam('msg')
   };
 
   (function init(){
-    var code = getParam('code');
     if(!code){ return showState('✦','ギフトページ','こちらは贈り物専用ページです。受け取ったリンクからお開きください。'); }
-    var s = document.createElement('script');
-    s.src = GAS_API_URL + '?api=gift&code=' + encodeURIComponent(code) + '&callback=onGift&t=' + Date.now();
-    s.onerror = function(){ showState('⚠','読み込みに失敗しました','通信環境をご確認のうえ、再度お試しください。'); };
-    document.body.appendChild(s);
+    // 有効期限チェック（URLに期限がある場合のみ）
+    if(giftData.expiry){
+      var ex = new Date(giftData.expiry.replace(/-/g,'/'));
+      var today = new Date(); today.setHours(0,0,0,0);
+      if(!isNaN(ex.getTime()) && ex < today){
+        return showState('⏳','有効期限が過ぎています','大変申し訳ございません。お店までご相談ください。');
+      }
+    }
+    if(getParam('mode') === 'write') showWrite();   // 贈り主：メッセージ入力
+    else showOpening();                              // 受取人：開封
   })();
 
   function hideAll(){
@@ -275,28 +275,16 @@
   function savePersonalize(){
     var sender  = document.getElementById('wSender').value.trim();
     var message = document.getElementById('wMsg').value.trim();
-    var btn = document.querySelector('.w-btn');
-    btn.disabled = true; btn.textContent = '保存中…';
-    document.getElementById('wErr').style.display = 'none';
     giftData.sender = sender; giftData.message = message;
-    var s = document.createElement('script');
-    s.src = GAS_API_URL + '?api=save&code=' + encodeURIComponent(getParam('code')) +
-            '&sender='  + encodeURIComponent(sender) +
-            '&message=' + encodeURIComponent(message) +
-            '&callback=onSaved&t=' + Date.now();
-    s.onerror = onSaveError;
-    document.body.appendChild(s);
-  }
-  window.onSaved = function(res){
-    if(res && res.ok){ showShareCard(); }
-    else { onSaveError(); }
-  };
-  function onSaveError(){
-    var btn = document.querySelector('.w-btn');
-    btn.disabled = false; btn.textContent = 'この内容で贈る';
-    var el = document.getElementById('wErr');
-    el.textContent = '保存に失敗しました。通信環境をご確認のうえ、もう一度お試しください。';
-    el.style.display = 'block';
+    // お店の記録用に保存（no-cors POSTのため結果は確認しない。送信に失敗してもギフト自体は成立）
+    try{
+      fetch(GAS_API_URL, { method:'POST', mode:'no-cors',
+        headers:{ 'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8' },
+        body: 'code='    + encodeURIComponent(code) +
+              '&sender='  + encodeURIComponent(sender) +
+              '&message=' + encodeURIComponent(message) });
+    }catch(err){}
+    showShareCard();
   }
   function skipPersonalize(){
     giftData.sender = ''; giftData.message = '';
@@ -309,7 +297,11 @@
     hideAll();
     document.getElementById('card').style.display = 'block';
     document.getElementById('share').style.display = 'block';
-    var viewUrl = location.origin + location.pathname + '?code=' + encodeURIComponent(getParam('code'));
+    var viewUrl = location.origin + location.pathname + '?code=' + encodeURIComponent(code) +
+                  '&m=' + encodeURIComponent(giftData.menu || '') +
+                  '&e=' + encodeURIComponent(giftData.expiry || '');
+    if(giftData.sender)  viewUrl += '&s='   + encodeURIComponent(giftData.sender);
+    if(giftData.message) viewUrl += '&msg=' + encodeURIComponent(giftData.message);
     window._viewUrl = viewUrl;
     var name = giftData.sender ? (giftData.sender + 'さんから、') : '';
     var text = name + 'エンゼルウイングの贈り物が届きました。下のリンクからお受け取りください。\n' + viewUrl;
@@ -326,12 +318,12 @@
 
   // ===== 共通：カードに反映 =====
   function fillCard(d){
-    document.getElementById('cName').textContent   = d.menu;
-    document.getElementById('cMenu').textContent   = d.menu;
-    document.getElementById('cExpiry').textContent = d.expiry;
-    document.getElementById('cCode').textContent   = getParam('code');
-    document.getElementById('cReserve').href       = d.reserveUrl || '#';
-    document.getElementById('cLine').href          = d.lineUrl || '#';
+    document.getElementById('cName').textContent   = d.menu || 'ギフト';
+    document.getElementById('cMenu').textContent   = d.menu || '—';
+    document.getElementById('cExpiry').textContent = d.expiry || '—';
+    document.getElementById('cCode').textContent   = code;
+    document.getElementById('cReserve').href       = RESERVE_URL;
+    document.getElementById('cLine').href          = LINE_URL;
     if(d.message){
       document.getElementById('cMsg').textContent  = d.message;
       document.getElementById('cFrom').textContent = d.sender ? ('— ' + d.sender + ' より') : '';
