@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>エンゼルウイングからの贈り物</title>
+<link rel="icon" href="data:,"><!-- 他サイトのファビコン流用を防ぐ（アイコン非表示）-->
 
 <!-- ===== OGP（LINE等のトークで表示されるプレビュー）===== -->
 <!-- 全ギフト共通の1枚でOK。画像は 1200x630px 推奨。 -->
@@ -282,39 +283,65 @@
     document.getElementById('write').style.display = 'block';
   }
   function savePersonalize(){
-    var sender  = document.getElementById('wSender').value.trim();
-    var message = document.getElementById('wMsg').value.trim();
-    giftData.sender = sender; giftData.message = message;
-    // お店の記録用に保存（no-cors POSTのため結果は確認しない。送信に失敗してもギフト自体は成立）
+    giftData.sender  = document.getElementById('wSender').value.trim();
+    giftData.message = document.getElementById('wMsg').value.trim();
+    finalizeAndShare();
+  }
+  function skipPersonalize(){
+    giftData.sender = ''; giftData.message = '';
+    finalizeAndShare();
+  }
+  function finalizeAndShare(){
+    var btn = document.querySelector('.w-btn');
+    if(btn){ btn.disabled = true; btn.textContent = '準備中…'; }
+    var longView = buildViewUrl();
+    shorten(longView, function(shareUrl){
+      postSave(giftData.sender, giftData.message, shareUrl); // お店の記録用（リンクも保存）
+      showShareCard(shareUrl);
+    });
+  }
+  function buildViewUrl(){
+    var eCompact = (giftData.expiry || '').replace(/\//g,'');
+    var u = location.origin + location.pathname + '?code=' + encodeURIComponent(code) +
+            '&k=' + encodeURIComponent(giftData.menuKey || '') +
+            '&e=' + encodeURIComponent(eCompact);
+    if(giftData.sender)  u += '&s='   + encodeURIComponent(giftData.sender);
+    if(giftData.message) u += '&msg=' + encodeURIComponent(giftData.message);
+    return u;
+  }
+  // 外部サービス(is.gd)で短縮。失敗・非対応時は長いURLをそのまま使う（必ず成立）
+  function shorten(longUrl, cb){
+    var done = false;
+    var to = setTimeout(function(){ if(!done){ done=true; cb(longUrl); } }, 4000);
+    try{
+      fetch('https://is.gd/create.php?format=simple&url=' + encodeURIComponent(longUrl))
+        .then(function(r){ return r.text(); })
+        .then(function(t){ if(done) return; done=true; clearTimeout(to);
+          t = (t||'').trim(); cb(/^https?:\/\//.test(t) ? t : longUrl); })
+        .catch(function(){ if(done) return; done=true; clearTimeout(to); cb(longUrl); });
+    }catch(e){ if(!done){ done=true; clearTimeout(to); cb(longUrl); } }
+  }
+  // お店の記録用に保存（no-cors POSTのため結果は確認しない。送信失敗してもギフトは成立）
+  function postSave(sender, message, link){
     try{
       fetch(GAS_API_URL, { method:'POST', mode:'no-cors',
         headers:{ 'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8' },
         body: 'code='    + encodeURIComponent(code) +
               '&sender='  + encodeURIComponent(sender) +
-              '&message=' + encodeURIComponent(message) });
+              '&message=' + encodeURIComponent(message) +
+              '&link='    + encodeURIComponent(link) });
     }catch(err){}
-    showShareCard();
-  }
-  function skipPersonalize(){
-    giftData.sender = ''; giftData.message = '';
-    showShareCard();
   }
 
   // ===== 贈り主：完成 → LINEで贈る =====
-  function showShareCard(){
+  function showShareCard(shareUrl){
     fillCard(giftData);
     hideAll();
     document.getElementById('card').style.display = 'block';
     document.getElementById('share').style.display = 'block';
-    var eCompact = (giftData.expiry || '').replace(/\//g,'');
-    var viewUrl = location.origin + location.pathname + '?code=' + encodeURIComponent(code) +
-                  '&k=' + encodeURIComponent(giftData.menuKey || '') +
-                  '&e=' + encodeURIComponent(eCompact);
-    if(giftData.sender)  viewUrl += '&s='   + encodeURIComponent(giftData.sender);
-    if(giftData.message) viewUrl += '&msg=' + encodeURIComponent(giftData.message);
-    window._viewUrl = viewUrl;
+    window._viewUrl = shareUrl;
     var name = giftData.sender ? (giftData.sender + 'さんから、') : '';
-    var text = name + 'エンゼルウイングの贈り物が届きました。下のリンクからお受け取りください。\n' + viewUrl;
+    var text = name + 'エンゼルウイングの贈り物が届きました。下のリンクからお受け取りください。\n' + shareUrl;
     document.getElementById('lineShare').href = 'https://line.me/R/share?text=' + encodeURIComponent(text);
     window.scrollTo(0,0);
   }
