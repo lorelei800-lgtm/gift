@@ -26,7 +26,7 @@
     font-family:"Hiragino Mincho ProN","Yu Mincho",serif;
     -webkit-font-smoothing:antialiased;overflow-x:hidden;
   }
-  .stage{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px 18px;}
+  .stage{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 18px;}
 
   /* ---- ローディング ---- */
   #loading{color:#e9dcc0;text-align:center;letter-spacing:.2em;font-size:13px}
@@ -76,8 +76,8 @@
   .msg{
     background:#fff;border:1px solid var(--line);border-radius:12px;
     padding:14px 16px;margin:18px 0;color:#4a443c;font-size:14px;line-height:1.8;text-align:left;
-    white-space:pre-wrap;
   }
+  #cMsg{white-space:pre-wrap}
   .msg .from{display:block;text-align:right;color:var(--sub);font-size:12px;margin-top:8px}
   .meta{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);
     border-top:1px dashed var(--line);padding-top:14px;margin-top:6px}
@@ -104,6 +104,31 @@
   #state .ic{font-size:40px}
   #state .t{font-size:18px;font-weight:600;margin:10px 0 6px}
   #state .d{font-family:sans-serif;font-size:13px;color:var(--sub);line-height:1.7}
+
+  /* ---- 書き込み（お客様のメッセージ入力）---- */
+  #write{display:none;width:100%;max-width:380px;animation:rise .7s ease both}
+  .w-card{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:24px 22px;
+    box-shadow:0 20px 50px rgba(0,0,0,.45)}
+  .w-ttl{font-size:18px;color:var(--ink);text-align:center;font-weight:600}
+  .w-sub{font-family:sans-serif;font-size:12px;color:var(--sub);text-align:center;margin:6px 0 18px}
+  .w-label{display:block;font-family:sans-serif;font-size:12px;color:var(--gold-d);margin:14px 2px 6px}
+  #write input,#write textarea{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;
+    font-size:15px;background:#fff;font-family:sans-serif;color:var(--ink)}
+  #write textarea{min-height:90px;resize:vertical}
+  .w-btn{width:100%;border:0;border-radius:14px;padding:15px;margin-top:20px;font-size:16px;font-weight:700;
+    color:#fff;background:linear-gradient(180deg,#bd9a59,#9c7a3c);cursor:pointer;font-family:sans-serif}
+  .w-skip{width:100%;border:0;background:transparent;color:var(--sub);font-family:sans-serif;font-size:13px;
+    margin-top:12px;cursor:pointer;text-decoration:underline}
+  .w-err{color:#b3261e;font-family:sans-serif;font-size:13px;text-align:center;margin-top:10px;display:none}
+
+  /* ---- 共有（贈り主：LINEで贈る）---- */
+  #share{display:none;width:100%;max-width:380px;text-align:center;margin-top:16px}
+  .share-ttl{color:#efe2c5;font-size:15px;letter-spacing:.06em;margin-bottom:12px}
+  .line-share{display:block;background:#06c755;color:#fff;text-decoration:none;font-family:sans-serif;
+    font-weight:700;font-size:16px;padding:15px;border-radius:14px}
+  .copy-share{width:100%;margin-top:10px;border:1px solid rgba(255,255,255,.25);background:transparent;
+    color:#d9cdb2;font-family:sans-serif;font-size:14px;padding:12px;border-radius:12px;cursor:pointer}
+  .copymsg{font-family:sans-serif;font-size:12px;color:#b7a98c;margin-top:8px}
 </style>
 </head>
 <body>
@@ -118,6 +143,20 @@
     <div class="env"><div class="flap"></div><div class="seal">AW</div></div>
     <div class="open-ttl">あなたへ、贈り物が届いています</div>
     <div class="open-sub">タップして開く</div>
+  </div>
+
+  <div id="write">
+    <div class="w-card">
+      <div class="w-ttl">贈り物に、ひとことを添えましょう</div>
+      <div class="w-sub">大切な方へのメッセージを入力できます（任意）</div>
+      <label class="w-label">贈り主のお名前</label>
+      <input id="wSender" type="text" maxlength="40" placeholder="例）山田 花子">
+      <label class="w-label">メッセージ</label>
+      <textarea id="wMsg" maxlength="200" placeholder="例）いつもありがとう。ゆっくり休んでね。"></textarea>
+      <button class="w-btn" onclick="savePersonalize()">この内容で贈る</button>
+      <button class="w-skip" onclick="skipPersonalize()">メッセージなしで贈る</button>
+      <div class="w-err" id="wErr"></div>
+    </div>
   </div>
 
   <div id="card">
@@ -161,6 +200,13 @@
     </div>
   </div>
 
+  <div id="share">
+    <div class="share-ttl">完成しました！ この内容で贈れます</div>
+    <a class="line-share" id="lineShare" href="#" target="_blank" rel="noopener">LINEで贈る</a>
+    <button class="copy-share" onclick="copyView()">リンクをコピー</button>
+    <div class="copymsg" id="shareMsg"></div>
+  </div>
+
   <div id="state">
     <div class="ic" id="sIc">⚠</div>
     <div class="t" id="sT">—</div>
@@ -189,25 +235,97 @@
     if(data.state === 'used')   return showState('✓','このギフトは使用済みです','すでにご利用いただいたギフト券です。');
     if(data.state === 'expired')return showState('⏳','有効期限が過ぎています','大変申し訳ございません。お店までご相談ください。');
     giftData = data;
-    showOpening();
+    if(getParam('mode') === 'write') showWrite();   // 贈り主：メッセージ入力
+    else showOpening();                              // 受取人：開封
   };
 
   (function init(){
     var code = getParam('code');
     if(!code){ return showState('✦','ギフトページ','こちらは贈り物専用ページです。受け取ったリンクからお開きください。'); }
     var s = document.createElement('script');
-    s.src = GAS_API_URL + '?api=gift&code=' + encodeURIComponent(code) + '&callback=onGift';
+    s.src = GAS_API_URL + '?api=gift&code=' + encodeURIComponent(code) + '&callback=onGift&t=' + Date.now();
     s.onerror = function(){ showState('⚠','読み込みに失敗しました','通信環境をご確認のうえ、再度お試しください。'); };
     document.body.appendChild(s);
   })();
 
-  function showOpening(){
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('opening').style.display = 'flex';
+  function hideAll(){
+    ['loading','opening','write','card','share','state'].forEach(function(id){
+      document.getElementById(id).style.display = 'none';
+    });
   }
 
+  // ===== 受取人：開封 =====
+  function showOpening(){
+    hideAll();
+    document.getElementById('opening').style.display = 'flex';
+  }
   function openCard(){
-    var d = giftData;
+    fillCard(giftData);
+    hideAll();
+    document.getElementById('card').style.display = 'block';
+  }
+
+  // ===== 贈り主：メッセージ入力（?mode=write）=====
+  function showWrite(){
+    hideAll();
+    document.getElementById('wSender').value = giftData.sender || '';
+    document.getElementById('wMsg').value    = giftData.message || '';
+    document.getElementById('write').style.display = 'block';
+  }
+  function savePersonalize(){
+    var sender  = document.getElementById('wSender').value.trim();
+    var message = document.getElementById('wMsg').value.trim();
+    var btn = document.querySelector('.w-btn');
+    btn.disabled = true; btn.textContent = '保存中…';
+    document.getElementById('wErr').style.display = 'none';
+    giftData.sender = sender; giftData.message = message;
+    var s = document.createElement('script');
+    s.src = GAS_API_URL + '?api=save&code=' + encodeURIComponent(getParam('code')) +
+            '&sender='  + encodeURIComponent(sender) +
+            '&message=' + encodeURIComponent(message) +
+            '&callback=onSaved&t=' + Date.now();
+    s.onerror = onSaveError;
+    document.body.appendChild(s);
+  }
+  window.onSaved = function(res){
+    if(res && res.ok){ showShareCard(); }
+    else { onSaveError(); }
+  };
+  function onSaveError(){
+    var btn = document.querySelector('.w-btn');
+    btn.disabled = false; btn.textContent = 'この内容で贈る';
+    var el = document.getElementById('wErr');
+    el.textContent = '保存に失敗しました。通信環境をご確認のうえ、もう一度お試しください。';
+    el.style.display = 'block';
+  }
+  function skipPersonalize(){
+    giftData.sender = ''; giftData.message = '';
+    showShareCard();
+  }
+
+  // ===== 贈り主：完成 → LINEで贈る =====
+  function showShareCard(){
+    fillCard(giftData);
+    hideAll();
+    document.getElementById('card').style.display = 'block';
+    document.getElementById('share').style.display = 'block';
+    var viewUrl = location.origin + location.pathname + '?code=' + encodeURIComponent(getParam('code'));
+    window._viewUrl = viewUrl;
+    var name = giftData.sender ? (giftData.sender + 'さんから、') : '';
+    var text = name + 'エンゼルウイングの贈り物が届きました。下のリンクからお受け取りください。\n' + viewUrl;
+    document.getElementById('lineShare').href = 'https://line.me/R/share?text=' + encodeURIComponent(text);
+    window.scrollTo(0,0);
+  }
+  function copyView(){
+    navigator.clipboard.writeText(window._viewUrl || '').then(function(){
+      document.getElementById('shareMsg').textContent = 'リンクをコピーしました。LINEのトークに貼り付けて送れます。';
+    }, function(){
+      document.getElementById('shareMsg').textContent = window._viewUrl || '';
+    });
+  }
+
+  // ===== 共通：カードに反映 =====
+  function fillCard(d){
     document.getElementById('cName').textContent   = d.menu;
     document.getElementById('cMenu').textContent   = d.menu;
     document.getElementById('cExpiry').textContent = d.expiry;
@@ -218,15 +336,13 @@
       document.getElementById('cMsg').textContent  = d.message;
       document.getElementById('cFrom').textContent = d.sender ? ('— ' + d.sender + ' より') : '';
       document.getElementById('cMsgBox').style.display = 'block';
+    } else {
+      document.getElementById('cMsgBox').style.display = 'none';
     }
-    document.getElementById('opening').style.display = 'none';
-    document.getElementById('card').style.display = 'block';
   }
 
   function showState(ic,t,d){
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('opening').style.display = 'none';
-    document.getElementById('card').style.display = 'none';
+    hideAll();
     document.getElementById('sIc').textContent = ic;
     document.getElementById('sT').textContent = t;
     document.getElementById('sD').textContent = d;
