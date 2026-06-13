@@ -226,10 +226,19 @@
     return m ? decodeURIComponent(m[1].replace(/\+/g,' ')) : '';
   }
 
+  var MENU_MAP = { ashi70: '足揉み70分', shifuku100: '至福の100分' };
+
+  function fmtExp(raw){
+    if(/^\d{8}$/.test(raw)) return raw.slice(0,4)+'/'+raw.slice(4,6)+'/'+raw.slice(6,8);
+    return raw; // 旧形式(YYYY/MM/DD)や空はそのまま
+  }
+
   var code = getParam('code');
+  var menuKey = getParam('k');
   var giftData = {
-    menu:    getParam('m'),
-    expiry:  getParam('e'),
+    menuKey: menuKey,
+    menu:    MENU_MAP[menuKey] || getParam('m') || '',
+    expiry:  fmtExp(getParam('e')),
     sender:  getParam('s'),
     message: getParam('msg')
   };
@@ -244,7 +253,7 @@
         return showState('⏳','有効期限が過ぎています','大変申し訳ございません。お店までご相談ください。');
       }
     }
-    if(getParam('mode') === 'write') showWrite();   // 贈り主：メッセージ入力
+    if(getParam('w') === '1' || getParam('mode') === 'write') showWrite();   // 贈り主：メッセージ入力
     else showOpening();                              // 受取人：開封
   })();
 
@@ -297,9 +306,10 @@
     hideAll();
     document.getElementById('card').style.display = 'block';
     document.getElementById('share').style.display = 'block';
+    var eCompact = (giftData.expiry || '').replace(/\//g,'');
     var viewUrl = location.origin + location.pathname + '?code=' + encodeURIComponent(code) +
-                  '&m=' + encodeURIComponent(giftData.menu || '') +
-                  '&e=' + encodeURIComponent(giftData.expiry || '');
+                  '&k=' + encodeURIComponent(giftData.menuKey || '') +
+                  '&e=' + encodeURIComponent(eCompact);
     if(giftData.sender)  viewUrl += '&s='   + encodeURIComponent(giftData.sender);
     if(giftData.message) viewUrl += '&msg=' + encodeURIComponent(giftData.message);
     window._viewUrl = viewUrl;
